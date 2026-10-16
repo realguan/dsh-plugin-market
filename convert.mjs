@@ -37,6 +37,8 @@ const MAX_PUBLISH_TIMESTAMP = 1e11
 const SHA = /^[0-9a-f]{40}$/u
 /** Consecutive GitHub API refusals after which commit-date lookups stop for the rest of the run. */
 let apiRefusals = 0
+/** Revision of Git resolution; bump to re-resolve Git entries after changing how a commit is read. */
+const GIT_RESOLUTION_REVISION = 2
 
 /** Display titles for the capability ids the market records; an unknown id titles itself. */
 const CAPABILITY_TITLES = {
@@ -620,26 +622,48 @@ async function resolveGit(entry, github, options) {
 async function gitCommitTimestamp(github, commit, entry, options) {
   if (apiRefusals < 3 && typeof options.githubToken === 'string' && options.githubToken !== '') {
     const url = `https://api.github.com/repos/${github.owner}/${github.repo}/commits/${commit}`
-    try {
-      const response = await fetch(url, {
-        headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${String(options.githubToken)}`, 'user-agent': 'dsh-plugin-market/0.1.0' },
-        signal: AbortSignal.timeout(Number(options.timeoutMs)),
-      })
-      if (response.status === 403 || response.status === 429) {
-        apiRefusals += 1
-        if (apiRefusals === 3) process.stderr.write('github commit dates hit the token rate limit; using the market dates for the remaining git entries\n')
-      } else if (response.ok) {
-        const payload = await response.json()
-        if (isRecord(payload) && isRecord(payload.commit) && isRecord(payload.commit.committer) && typeof payload.commit.committer.date === 'string') {
-          const seconds = Math.floor(Date.parse(payload.commit.committer.date) / 1000)
-          if (Number.isFinite(seconds)) return seconds
-        }
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      let response
+      try {
+        response = await fetch(url, {
+          headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${String(options.githubToken)}`, 'user-agent': 'dsh-plugin-market/0.1.0' },
+          signal: AbortSignal.timeout(Number(options.timeoutMs)),
+        })
+      } catch {
+        // Network failure or timeout; retry, then keep the market's own date.
+        if (attempt < 3) { await delay(400 * attempt); continue }
+        break
       }
-    } catch {
-      // Network failure or timeout; the market's own date is still a usable timestamp.
+      if (response.status === 403 || response.status === 429) {
+        // Secondary limits are transient and answer with `retry-after`; the primary limit is not, and the
+        // breaker below stops asking rather than spending the rest of the run on refusals.
+        if (attempt < 3) { await delay(retryAfterMs(response, attempt * 1000)); continue }
+        apiRefusals += 1
+        if (apiRefusals === 3) process.stderr.write('github commit dates were refused; using the market dates for the remaining git entries\n')
+        break
+      }
+      if (!response.ok) break
+      const payload = await response.json()
+      if (isRecord(payload) && isRecord(payload.commit) && isRecord(payload.commit.committer) && typeof payload.commit.committer.date === 'string') {
+        const seconds = Math.floor(Date.parse(payload.commit.committer.date) / 1000)
+        if (Number.isFinite(seconds)) return seconds
+      }
+      break
     }
   }
   return fallbackTimestamp(entry)
+}
+
+/**
+ * Read how long a refused GitHub request asks the client to wait.
+ * @param {Response} response - the refused response.
+ * @param {number} fallbackMs - the delay to use without a usable header.
+ * @returns {number} the delay in milliseconds, at most 10 seconds.
+ */
+function retryAfterMs(response, fallbackMs) {
+  const header = response.headers.get('retry-after')
+  const seconds = header === null ? Number.NaN : Number(header)
+  return Number.isFinite(seconds) ? Math.min(seconds * 1000, 10_000) : fallbackMs
 }
 
 /**
@@ -660,7 +684,14 @@ function fallbackTimestamp(entry) {
  * @returns {Promise<{ plugin?: Record<string, unknown>, kind: 'npm' | 'git', skip?: string, cached: boolean }>} the outcome.
  */
 async function resolveCached(entry, options) {
-  const key = createHash('sha256').update(JSON.stringify([entry.npm ?? null, entry.version ?? null, entry.url ?? null])).digest('hex').slice(0, 32)
+  const npmName = typeof entry.npm === 'string' && entry.npm !== '' ? entry.npm : undefined
+  const version = typeof entry.version === 'string' && entry.version !== '' ? entry.version : undefined
+  const kind = npmName !== undefined && version !== undefined && options.source !== 'git' ? 'npm' : 'git'
+  // The key carries a resolution revision, so improving how a kind is resolved invalidates only that kind.
+  const revision = kind === 'git' ? GIT_RESOLUTION_REVISION : 1
+  const key = createHash('sha256')
+    .update(JSON.stringify([kind, revision, npmName ?? null, version ?? null, entry.url ?? null]))
+    .digest('hex').slice(0, 32)
   const file = join(String(options.cache), `${key}.json`)
   if (!options.refresh) {
     try {
