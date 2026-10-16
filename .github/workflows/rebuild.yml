@@ -57,4 +57,19 @@ jobs:
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" dist
 
       - name: Purge the jsDelivr cache
-        run: curl -sS "https://purge.jsdelivr.net/gh/${{ github.repository }}@dist/dsh-index.json"
+        # jsDelivr caches a branch reference for 12 hours and its branch-to-commit resolution does not
+        # follow a purge, so this only clears the file caches. Waiting first keeps the purge from
+        # re-filling the edge from the commit that was current before this push.
+        run: |
+          sleep 15
+          curl -sS "https://purge.jsdelivr.net/gh/${{ github.repository }}@dist/dsh-index.json" > /dev/null
+          local_hash=$(sha256sum out/dsh-index.json | cut -d' ' -f1)
+          for attempt in 1 2 3 4; do
+            sleep 15
+            served=$(curl -sS "https://cdn.jsdelivr.net/gh/${{ github.repository }}@dist/dsh-index.json" | sha256sum | cut -d' ' -f1)
+            if [ "$served" = "$local_hash" ]; then
+              echo "jsDelivr is serving the new index"
+              exit 0
+            fi
+          done
+          echo "::warning::jsDelivr still serves an earlier revision; its branch cache can take up to 12 hours to expire"

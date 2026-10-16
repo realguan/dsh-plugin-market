@@ -69,13 +69,29 @@ https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json
 
 接入方式：DSH → **Plugins** → **More**（Experimental plugins 旁）→ 打开 **Custom plugin markets** → **Discover** → **Add index source** → 填入上面这个 URL。
 
-jsDelivr 的实测响应头是 `cache-control: public, max-age=604800, s-maxage=43200`，即**浏览器 7 天、边缘 12 小时**。更新后要立刻生效就调 purge：
+jsDelivr 的实测响应头是 `cache-control: public, max-age=604800, s-maxage=43200`，即**浏览器 7 天、边缘 12 小时**。更新后可以调 purge：
 
 ```sh
 curl https://purge.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json
 ```
 
-`publish.sh` 已经带了这一步。
+### ⚠️ jsDelivr 的分支引用最长会滞后 12 小时
+
+实测（2026-10-16）：连着发布三版后，`@dist` 一直返回前两版；而同一时刻
+
+| URL | 返回 |
+|---|---|
+| `...@dist/dsh-index.json` | 旧版（03:22） |
+| `...@<commit-sha>/dsh-index.json` | **最新（03:55）** |
+| `raw.githubusercontent.com/.../dist/dsh-index.json` | **最新（03:55）** |
+
+也就是说**文件内容没问题，是 jsDelivr 的「分支 → commit」解析被缓存了**，purge 清不掉它（连发 8 次 purge 仍在两版之间摆动）。这是 jsDelivr 对分支引用的既定行为，TTL 就是 `s-maxage=43200`。
+
+实践含义：**每次发布后最长 12 小时才会全网生效**。对每天更新一次的市场来说可以接受（DSH 看到的数据最多滞后一天）。`publish.sh` 和 workflow 会在 purging 后轮询并如实告诉你 CDN 有没有跟上，不会假装成功。
+
+如果你需要「发完立刻生效」，把索引发布到 **Cloudflare Pages**（单文件上限 25 MiB，边缘缓存很短，国内可达性也不错），jsDelivr 就只当作加速镜像。
+
+`publish.sh` 已经带了 purge 和收敛检查。
 
 ### 更新索引
 
