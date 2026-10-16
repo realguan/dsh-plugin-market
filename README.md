@@ -69,3 +69,5 @@ https://realguan.github.io/dsh-plugin-market/dsh-index.json                   # 
 ## 维护
 
 索引的生成、发布与验证方式见 [TOOLING.md](TOOLING.md)：转换器逐条回源核实、用 DSH 官方校验器自检、每天由 GitHub Actions 自动重建，同时支持本机 `./publish.sh` 手动发布。
+
+本仓库的工具代码以 [MIT](LICENSE) 发布，欢迎取用；索引里的条目数据如上所述来自 awesome-dsh-plugin（CC0-1.0）。
