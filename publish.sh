@@ -21,6 +21,7 @@ INPUT=${INPUT:-https://awesome-dsh-plugin.com/plugins.json}
 INDEX_URL="https://cdn.jsdelivr.net/gh/${REPO}@${BRANCH}/dsh-index.json"
 
 cd "$(dirname "$0")"
+project_dir=$(pwd)
 
 if [ "${SKIP_CONVERT:-0}" != "1" ]; then
   node convert.mjs --input "$INPUT" --output out/dsh-index.json --index-url "$INDEX_URL"
@@ -29,10 +30,12 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cp out/dsh-index.json "$work/dsh-index.json"
+# GitHub Pages serves this branch too; without .nojekyll it would run Jekyll over the artifact.
+touch "$work/.nojekyll"
 
 cd "$work"
 git init -q -b "$BRANCH"
-git add dsh-index.json
+git add dsh-index.json .nojekyll
 git -c user.name="index-bot" -c user.email="index-bot@users.noreply.github.com" \
   commit -qm "publish $(date -u +%Y-%m-%dT%H:%M:%SZ) $(du -h dsh-index.json | cut -f1)"
 git push -q --force "git@github.com:${REPO}.git" "$BRANCH"
@@ -43,7 +46,7 @@ printf 'published %s\n' "$INDEX_URL"
 sleep 15
 curl -sS "https://purge.jsdelivr.net/gh/${REPO}@${BRANCH}/dsh-index.json" > /dev/null || true
 
-local_hash=$(shasum -a 256 out/dsh-index.json | cut -d' ' -f1)
+local_hash=$(shasum -a 256 "$project_dir/out/dsh-index.json" | cut -d' ' -f1)
 for _attempt in 1 2 3 4; do
   sleep 15
   served=$(curl -sS -m 60 "$INDEX_URL" | shasum -a 256 | cut -d' ' -f1 || true)

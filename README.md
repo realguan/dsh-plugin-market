@@ -59,21 +59,18 @@ node convert.mjs --input ./plugins.json --title "Awesome DSH Plugin" --title-zh 
 
 **只收录真正可安装的条目**：manifest 必须声明 `dsh.bundle`，且 `version` 必须是精确 SemVer。其余条目写进报告而不写进索引——因为 DSH 安装时会拒收没有 bundle patch 的包。
 
-## 发布：jsDelivr（免费 CDN）
+## 发布与访问地址
 
-索引发布在本仓库的 `dist` 分支，由 jsDelivr 直接做 CDN：
+索引发布在本仓库的 `dist` 分支（单提交快照），同时由两个免费 CDN 提供：
 
-```
-https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json
-```
+| URL | 生效速度 | 国内可达性 |
+|---|---|---|
+| `https://realguan.github.io/dsh-plugin-market/dsh-index.json` | **约 10 分钟**（`cache-control: max-age=600`） | 一般，可能被墙 |
+| `https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json` | 最长 **12 小时**（见下） | 快 |
 
-接入方式：DSH → **Plugins** → **More**（Experimental plugins 旁）→ 打开 **Custom plugin markets** → **Discover** → **Add index source** → 填入上面这个 URL。
+接入方式：DSH → **Plugins** → **More**（Experimental plugins 旁）→ 打开 **Custom plugin markets** → **Discover** → **Add index source** → 填入其中一个 URL。
 
-jsDelivr 的实测响应头是 `cache-control: public, max-age=604800, s-maxage=43200`，即**浏览器 7 天、边缘 12 小时**。更新后可以调 purge：
-
-```sh
-curl https://purge.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json
-```
+**只加一个**：两个都加会在 Discover 里出现两个市场、同一批插件重复显示。想「发完立刻生效」用 Pages，想国内快用 jsDelivr。
 
 ### ⚠️ jsDelivr 的分支引用最长会滞后 12 小时
 
@@ -87,9 +84,9 @@ curl https://purge.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.jso
 
 也就是说**文件内容没问题，是 jsDelivr 的「分支 → commit」解析被缓存了**，purge 清不掉它（连发 8 次 purge 仍在两版之间摆动）。这是 jsDelivr 对分支引用的既定行为，TTL 就是 `s-maxage=43200`。
 
-实践含义：**每次发布后最长 12 小时才会全网生效**。对每天更新一次的市场来说可以接受（DSH 看到的数据最多滞后一天）。`publish.sh` 和 workflow 会在 purging 后轮询并如实告诉你 CDN 有没有跟上，不会假装成功。
+实践含义：**jsDelivr 每次发布后最长 12 小时才会全网生效**。对每天更新一次的市场来说可以接受（DSH 看到的数据最多滞后一天）。需要立刻生效就用上面的 GitHub Pages 地址；`publish.sh` 和 workflow 会在 purge 后轮询并如实报告 jsDelivr 有没有跟上，不会假装成功。
 
-如果你需要「发完立刻生效」，把索引发布到 **Cloudflare Pages**（单文件上限 25 MiB，边缘缓存很短，国内可达性也不错），jsDelivr 就只当作加速镜像。
+如果要一个**既国内快、又发完就生效**的地址，就再接一个 Cloudflare Pages（单文件上限 25 MiB，边缘缓存很短）；`wrangler pages deploy` 那一步已经可以按需加进 workflow。
 
 `publish.sh` 已经带了 purge 和收敛检查。
 
