@@ -20,21 +20,30 @@ const { parseIndexBody } = await import(join(dsh, 'packages/boot/plugin-market/s
 const { MarketSearch } = await import(join(dsh, 'packages/boot/plugin-market/src/search.ts'))
 const { marketInstallTarget } = await import(join(dsh, 'packages/util/plugin-market-index/src/index.ts'))
 
-const file = process.argv[2] ?? 'out/dsh-index.json'
-const body = await readFile(file)
-
-// Serve and fetch the document, so the bytes verified are the bytes a market host returns.
-const server = createServer((_request, response) => {
-  response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-  response.end(body)
-})
-await new Promise(resolve => { server.listen(0, '127.0.0.1', resolve) })
-const address = server.address()
-if (address === null || typeof address === 'string') throw new Error('no server address')
-const url = process.argv[3] ?? `http://127.0.0.1:${String(address.port)}/dsh-index.json`
-const response = await fetch(url)
-const bytes = new Uint8Array(await response.arrayBuffer())
-server.close()
+const target = process.argv[2] ?? 'out/dsh-index.json'
+let bytes
+let url
+if (/^https?:/u.test(target)) {
+  // Verify the published document itself, exactly the bytes a market host returns.
+  const response = await fetch(target)
+  if (!response.ok) throw new Error(`${target}: HTTP ${String(response.status)}`)
+  bytes = new Uint8Array(await response.arrayBuffer())
+  url = target
+} else {
+  const body = await readFile(target)
+  // Serve and fetch the document locally, so the verified bytes travel over HTTP as they do in production.
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+    response.end(body)
+  })
+  await new Promise(resolve => { server.listen(0, '127.0.0.1', resolve) })
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('no server address')
+  url = process.argv[3] ?? `http://127.0.0.1:${String(address.port)}/dsh-index.json`
+  const response = await fetch(url)
+  bytes = new Uint8Array(await response.arrayBuffer())
+  server.close()
+}
 
 const parsed = parseIndexBody(bytes, url)
 if (!parsed.ok) {
