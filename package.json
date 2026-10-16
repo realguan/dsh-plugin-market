@@ -1,0 +1,22 @@
+{
+  "name": "dsh-plugin-market",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "DSH plugin market index generated from awesome-dsh-plugin, published over jsDelivr",
+  "engines": {
+    "node": "^22.19 || >=24"
+  },
+  "scripts": {
+    "convert": "node convert.mjs",
+    "convert:sample": "node convert.mjs --limit 40 --refresh",
+    "verify": "TSX_TSCONFIG_PATH=${DSH_CHECKOUT:-/Users/guan/git/deepseek-harness}/tsconfig.json node --import tsx/esm verify-dsh-market.mts out/dsh-index.json"
+  },
+  "dependencies": {
+    "semver": "^7.7.3",
+    "@deepseek-ai/dsh-plugin-market-index": "^0.2.1-alpha.4"
+  },
+  "devDependencies": {
+    "tsx": "^4.22.4"
+  }
+}

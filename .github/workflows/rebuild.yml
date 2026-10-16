@@ -1,0 +1,60 @@
+name: Rebuild market index
+
+# Keeps https://cdn.jsdelivr.net/gh/<owner>/<repo>@dist/dsh-index.json current:
+# regenerates from the upstream market and force-pushes the artifact to the `dist` branch.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rebuild-index
+  cancel-in-progress: true
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Resolutions are cached per entry, so a run only pays for what upstream changed.
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: market-cache-${{ github.run_id }}
+          restore-keys: market-cache-
+
+      - run: npm ci
+
+      - name: Build the index
+        env:
+          # Only the repository token: it allows 1,000 API calls per hour, and the converter stops
+          # asking for commit dates after three refusals, keeping the market's own dates instead.
+          # Add a personal token as MARKET_GH_TOKEN for exact commit times on every Git entry.
+          GITHUB_TOKEN: ${{ secrets.MARKET_GH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          node convert.mjs \
+            --index-url "https://cdn.jsdelivr.net/gh/${{ github.repository }}@dist/dsh-index.json" \
+            --output out/dsh-index.json
+
+      - name: Publish to the dist branch
+        run: |
+          mkdir -p /tmp/dist && cp out/dsh-index.json /tmp/dist/
+          cd /tmp/dist
+          git init -q -b dist
+          git add dsh-index.json
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+            commit -qm "publish $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push -q --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" dist
+
+      - name: Purge the jsDelivr cache
+        run: curl -sS "https://purge.jsdelivr.net/gh/${{ github.repository }}@dist/dsh-index.json"
