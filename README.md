@@ -20,11 +20,13 @@ https://realguan.github.io/dsh-plugin-market/dsh-index.json                   # 
 
 ## 在 DSH 里添加
 
-1. 打开 **Plugins** → **More**（在 Experimental plugins 旁）→ 打开 **Custom plugin markets**
-2. 切到 **Discover** → **Add index source** → 粘贴上面任意一个地址
-3. 之后即可搜索、按分类与能力标签过滤、按下载量或星标排序
+1. 侧边栏打开 **插件**（Plugins）→ 在 **实验性插件** 一栏点 **更多**（More）→ 打开 **自定义插件市场**（Custom plugin markets）。开启后它也会出现在插件主列表里。
+2. 进入插件页的 **发现**（Discover）标签页 → 点 **添加索引源**（Add index source）→ 在 **索引 URL** 里粘贴上面任意一个地址 → 点 **添加**。
+3. 之后就可以用 **搜索插件** 搜索、用 **标签** 按能力过滤、用 **排序** 按分类 / 下载量 / 星标排列。
 
-每个插件卡片显示推荐版本（兼容当前 DSH、且非预发布的最新版），点 **Install** 会先弹出确认，显示该版本的来源：npm 包名与 registry，或 Git 仓库、commit 和子目录。确认后才开始安装，安装过程仍会走 DSH 自己的兼容性与 registry 检查。
+插件卡片显示推荐版本（兼容当前 DSH、且非预发布的最新版）。点 **安装** 会先弹出确认，显示该版本的来源：npm 包名与 registry，或 Git 仓库、commit 和子目录。确认后才开始安装，安装过程仍会走 DSH 自己的兼容性与 registry 检查。
+
+如果索引读不出来，打开 **管理索引源…**（Manage index sources…）能看到每个来源最后一次的错误，带出错的 JSON 路径。
 
 ## 市场里有什么
 

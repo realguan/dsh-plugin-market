@@ -53,9 +53,9 @@ node convert.mjs --input ./plugins.json --title "Awesome DSH Plugin" --title-zh 
 | `homepage` / `repository` | manifest 的 `homepage`、上游 `url`（`.../tree/<branch>/<dir>` 会解析成 `repository.url` + `repository.directory`） |
 | `icon` | manifest 声明了 `icon` 时，npm 指向 `cdn.jsdelivr.net/npm/<name>@<version>/…`，Git 指向该 commit 的 `raw.githubusercontent.com` 路径 |
 | `metadata.category` | 上游 `category`，并在根 `metadata.categories` 中声明 |
-| `metadata.labels` | 上游 `capabilities`，在 `metadata.labels` 中声明（Discover 的 Labels 菜单据此过滤） |
+| `metadata.labels` | 上游 `capabilities`，在 `metadata.labels` 中声明（「发现」页的「标签」菜单据此过滤） |
 | `metadata.keywords` | manifest 的 `keywords` |
-| `metadata.sortKeys` | `downloads`、`stars`、`added`（Unix 秒），对应 Discover 的 Sort 菜单 |
+| `metadata.sortKeys` | `downloads`、`stars`、`added`（Unix 秒），对应「发现」页的「排序」菜单 |
 
 **只收录能装的条目**：manifest 必须声明 `dsh.bundle`，`version` 必须是精确 SemVer。其余条目写进报告而不写进索引，因为 DSH 安装时会拒收没有 bundle patch 的包。
 
