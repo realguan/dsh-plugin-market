@@ -1,144 +1,58 @@
-# awesome-dsh-plugin → DSH 插件市场索引
+# DSH 插件市场 · DSH Plugin Market
 
-把 [`awesome-dsh-plugin.com/plugins.json`](https://awesome-dsh-plugin.com/plugins.json) 转换成 DSH 插件市场索引（format 1），也就是 DSH 的 **Discover** 标签页和 `plugin_market` 工具实际读取的那份 JSON。
+一个可以直接加进 **DeepSeek Harness (DSH)** 的第三方插件市场：**4,500+ 个插件**，带中英双语标题与描述、23 个分类、10 个能力标签，可按下载量 / 星标 / 收录时间排序。索引每天自动重建。
 
-`plugins.json` 本身是 awesome-list 结构（`name` / `owner` / `url` / `category` / `npm` / `version` / `stars` / `downloads` / `install`），DSH 会以 `$.format must be 1` 直接拒绝。本工具把它转换成 DSH 能读的格式，同时保留原站的分类、能力标签、stars、下载量和收录时间。
+## 市场地址
 
-## 用法
-
-```sh
-npm install
-
-# 全量转换（默认读线上 plugins.json，写 out/dsh-index.json）
-node convert.mjs
-
-# 试跑 40 条，先看看结果
-node convert.mjs --limit 40 --output out/sample.json
-
-# 本地文件、自定义标题
-node convert.mjs --input ./plugins.json --title "Awesome DSH Plugin" --title-zh "插件精选"
+```
+https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json     # 国内访问快
+https://realguan.github.io/dsh-plugin-market/dsh-index.json                   # 更新最快
 ```
 
-| 选项 | 默认 | 说明 |
+| 地址 | 生效速度 | 建议 |
 |---|---|---|
-| `--input <file\|url>` | `https://awesome-dsh-plugin.com/plugins.json` | 源文档 |
-| `--output <file>` | `out/dsh-index.json` | 输出的索引 |
-| `--report <file>` | `<output>.report.json` | 跳过条目及其原因的报告 |
-| `--cache <dir>` | `.cache` | 解析缓存；重跑只补新增条目 |
-| `--title` / `--title-zh` / `--description` | — | 市场标题与描述 |
-| `--registry <url>` | `https://registry.npmjs.org/` | npm 源；非官方 registry 会写进每个 npm 版本 |
-| `--source <all\|npm\|git>` | `all` | 只转换其中一类 |
-| `--limit <n>` | 不限 | 试跑条数 |
-| `--concurrency <n>` | `8` | 并发 |
-| `--timeout-ms <n>` / `--retries <n>` | `30000` / `3` | 网络超时与重试 |
-| `--github-token <tok>` | `$GITHUB_TOKEN` | 用 GitHub API 取精确 commit 时间 |
-| `--refresh` | — | 忽略缓存，全部重新解析 |
-| `--retry-skipped` | — | 只重试缓存中“已跳过”的条目（网络抖动导致的失败） |
+| GitHub Pages | 约 **10 分钟** | 想要最新数据 |
+| jsDelivr | 最长 **12 小时** | 国内访问，`s-maxage=43200` 是 jsDelivr 对分支引用的固有限制 |
 
-退出码：`0` 成功；`1` 源文档读不到或校验失败；`2` 参数错误。
+**两个地址内容相同，只加一个。** 都加会在 DSH 里出现两个市场、同一批插件重复显示。
 
-## 转换规则
+索引由 GitHub Actions **每天 03:17 UTC** 重建（也可以手动触发），在 DSH 的市场菜单里显示为 **DSH Plugin Market / DSH 插件市场**。
 
-每条记录都会回到源头核实，而不是照抄原站字段：
+## 在 DSH 里添加
 
-| 索引字段 | 来源 |
+1. 打开 **Plugins** → **More**（在 Experimental plugins 旁）→ 打开 **Custom plugin markets**
+2. 切到 **Discover** → **Add index source** → 粘贴上面任意一个地址
+3. 之后即可搜索、按分类与能力标签过滤、按下载量或星标排序
+
+每个插件卡片显示推荐版本（兼容当前 DSH、且非预发布的最新版），点 **Install** 会先弹出确认，显示该版本的来源：npm 包名与 registry，或 Git 仓库、commit 和子目录。确认后才开始安装，安装过程仍会走 DSH 自己的兼容性与 registry 检查。
+
+## 市场里有什么
+
+最近一次转换（2026-10-16）：
+
+| 项目 | 数量 |
 |---|---|
-| `name` | npm 条目的包名；Git 条目取该 commit 下 `package.json` 的 `name`（常与原站仓库名不同，例如 `dsh-restart-button` → `@pangxitong/dsh-restart-button`） |
-| `versions[0].version` | npm 条目用 `npm` 字段，并确认该版本确实存在；Git 条目取 manifest 的 `version`（必须是精确 SemVer） |
-| `versions[0].publishTimestamp` | npm：registry `time[<version>]`；Git：加了 `--github-token` 时取 commit committer 时间，否则退回 `added` 日期（UTC 零点） |
-| `versions[0].source` | npm → `{ "type": "npm" }`；Git → `{ "type": "git", "url", "commit", "path?" }`，commit 由 `git ls-remote` 解析并钉死 |
-| `versions[0].engines.dsh` | manifest 的 `engines.dsh`；没有时取 `@deepseek-ai/dsh*` peerDependencies 的合取（只声明 `dsh` 时省略表示“任意版本”） |
-| `title` / `description` / `author` | 原站的 `name` / `description`（双语）/ `owner` |
-| `homepage` / `repository` | manifest 的 `homepage`、原站 `url`（含 monorepo 子目录解析为 `repository.directory`） |
-| `icon` | manifest 声明了 `icon` 时，npm 指向 `cdn.jsdelivr.net/npm/<name>@<version>/…`，Git 指向该 commit 的 `raw.githubusercontent.com` 路径 |
-| `metadata.category` | 原站 `category`，并在根 `metadata.categories` 中声明 |
-| `metadata.labels` | 原站 `capabilities`，在 `metadata.labels` 中声明（Discover 的 Labels 菜单即可按能力过滤） |
-| `metadata.keywords` | manifest 的 `keywords` |
-| `metadata.sortKeys` | `downloads`、`stars`、`added`（Unix 秒），可在 Discover 的 Sort 菜单里排序 |
-| `repository.directory` / 子目录 | 原站 `url` 形如 `.../tree/<branch>/<dir>` 时解析为包目录 |
+| 插件 | **4,562** |
+| 安装来源 | npm 2,448 · Git 2,114 |
+| 分类 | 23（AGI、UI、主题、模型、记忆、技能、工作流、安全……） |
+| 能力标签 | 10（`network`、`llm`、`shell`、`fs-read`、`fs-write`、`env`、`credentials`、`subagent`、`dynamic-code`、`host-runtime`） |
+| 排序键 | 下载量 · 星标 · 收录时间 |
+| 带图标 | 209 |
 
-**只收录真正可安装的条目**：manifest 必须声明 `dsh.bundle`，且 `version` 必须是精确 SemVer。其余条目写进报告而不写进索引——因为 DSH 安装时会拒收没有 bundle patch 的包。
+每个版本都钉死在确切的 npm 版本或 Git commit 上，安装的构建与列表显示的完全一致；`engines.dsh` 来自插件自己的声明（或它的 `@deepseek-ai/dsh*` peer 依赖），DSH 会据此标注兼容性。
 
-## 发布与访问地址
+## 鸣谢 · 数据来源
 
-索引发布在本仓库的 `dist` 分支（单提交快照），同时由两个免费 CDN 提供：
+**条目数据来自 [awesome-dsh-plugin](https://awesome-dsh-plugin.com/)** —— 分类体系、能力标注、stars 与下载量统计都由这个项目维护和审校。它的源码在 [github.com/awesome-dsh-plugin/awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)，以 **CC0-1.0** 发布。没有它就没有这个市场。
 
-| URL | 生效速度 | 国内可达性 |
-|---|---|---|
-| `https://realguan.github.io/dsh-plugin-market/dsh-index.json` | **约 10 分钟**（`cache-control: max-age=600`） | 一般，可能被墙 |
-| `https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json` | 最长 **12 小时**（见下） | 快 |
+**插件本身归各自作者所有。** 本仓库不托管、不修改任何插件代码，只发布一份描述它们从哪里安装的索引；每个插件的标题、描述、作者与来源都来自上游条目和插件自己的 manifest。
 
-接入方式：DSH → **Plugins** → **More**（Experimental plugins 旁）→ 打开 **Custom plugin markets** → **Discover** → **Add index source** → 填入其中一个 URL。
+本仓库做的是把这些数据逐条回到源头（npm registry / Git commit）核实，转换成 DSH 的市场索引格式（[format 1](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/implemented/feature/2026-10-02-plugin-market-index-format.md)），然后托管成上面两个免费地址。
 
-**只加一个**：两个都加会在 Discover 里出现两个市场、同一批插件重复显示。想「发完立刻生效」用 Pages，想国内快用 jsDelivr。
+## 安全提示
 
-### ⚠️ jsDelivr 的分支引用最长会滞后 12 小时
+市场内容是第三方声明。DSH 只校验索引的文件格式，不校验这些声明是否属实 —— 标题、作者、星标、下载量都来自市场方，`official` 之类的标签也不代表 DSH 官方认证。安装前请查看确认框里的来源（npm 包名或 Git 仓库 + commit），只添加你信任的市场来源。
 
-实测（2026-10-16）：连着发布三版后，`@dist` 一直返回前两版；而同一时刻
+## 维护
 
-| URL | 返回 |
-|---|---|
-| `...@dist/dsh-index.json` | 旧版（03:22） |
-| `...@<commit-sha>/dsh-index.json` | **最新（03:55）** |
-| `raw.githubusercontent.com/.../dist/dsh-index.json` | **最新（03:55）** |
-
-也就是说**文件内容没问题，是 jsDelivr 的「分支 → commit」解析被缓存了**，purge 清不掉它（连发 8 次 purge 仍在两版之间摆动）。这是 jsDelivr 对分支引用的既定行为，TTL 就是 `s-maxage=43200`。
-
-实践含义：**jsDelivr 每次发布后最长 12 小时才会全网生效**。对每天更新一次的市场来说可以接受（DSH 看到的数据最多滞后一天）。需要立刻生效就用上面的 GitHub Pages 地址；`publish.sh` 和 workflow 会在 purge 后轮询并如实报告 jsDelivr 有没有跟上，不会假装成功。
-
-如果要一个**既国内快、又发完就生效**的地址，就再接一个 Cloudflare Pages（单文件上限 25 MiB，边缘缓存很短）；`wrangler pages deploy` 那一步已经可以按需加进 workflow。
-
-`publish.sh` 已经带了 purge 和收敛检查。
-
-### 更新索引
-
-```sh
-./publish.sh          # 重新生成 → 强推 dist 分支 → 清 jsDelivr 缓存
-```
-
-或者交给 GitHub Actions：[`.github/workflows/rebuild.yml`](.github/workflows/rebuild.yml) 每天 03:17 UTC 重新生成并发布，也可以手动触发。Actions 里 `.cache` 会用 `actions/cache` 保留，所以一次 run 只为上游变化的部分付费。
-
-### 为什么用 dist 分支
-
-`dsh-index.json` 有 6 MB 且每天变。如果每天往 `main` 提交一份，仓库历史一年会涨到 GB 级；`dist` 分支每次强推一个单提交，历史永远只有一份快照，`main` 只放工具源码。
-
-### 为什么不需要 CORS
-
-DSH 是在 Host 进程里 `fetch` 这个索引的，不是浏览器发请求，所以不用给 jsDelivr 配任何 CORS 头（它本来就返回 `access-control-allow-origin: *`）。
-
-索引由 DSH 校验，任何一条规则不满足都会整份拒绝，错误会显示在 **Manage index sources…** 里（带 JSON 路径）。`convert.mjs` 在写出文件前会用 DSH 官方校验器 `@deepseek-ai/dsh-plugin-market-index` 自检一次，不合格直接退出。
-
-## 用 DSH 自己的读取器验证
-
-`verify-dsh-market.mts` 不用 schema 副本，而是把文件通过 HTTP 提供出去，走 DSH 的解析路径（严格 UTF-8 + JSON + 校验），再用读取器自己的搜索引擎做检索和排序，并生成安装 spec：
-
-```sh
-npm run verify
-# 等价于（DSH_CHECKOUT 指向已 pnpm install 的 DSH 检出）：
-TSX_TSCONFIG_PATH=${DSH_CHECKOUT:-~/git/deepseek-harness}/tsconfig.json \
-  node --import tsx/esm verify-dsh-market.mts out/dsh-index.json
-```
-
-`DSH_CHECKOUT` 默认 `/Users/guan/git/deepseek-harness`；用它的 `tsconfig.json` 是为了让 tsx 把 `@deepseek-ai/dsh-*` 解析到源码而不是未构建的 `lib/`。
-
-## 已知限制
-
-- **Git 条目的 `publishTimestamp`**：不加 `--github-token` 时用原站 `added` 日期，因为 `git ls-remote` 不返回 commit 时间。
-- **只解析 GitHub**：原站 2347 条非 npm 条目全部指向 github.com；其他主机会被跳过并写进报告。
-- **仅收录原站列出的那个版本**，不展开历史版本；不存在于 registry 的版本会被跳过。
-- **Git 条目按默认分支 HEAD 钉住**，原站更新后需要重跑转换。
-- 索引未签名：标题、作者、stars、下载量都是市场声明，DSH 只校验格式。
-- **缓存按条目身份命中**：`.cache` 以 `npm@version` / 仓库 URL 为键复用解析结果；改动「解析规则」后用 `--refresh` 重新解析，只改「展示规则」（标题、仓库链接、图标等）则每次生成都会重算，不需要重新联网。
-- **同名包冲突**：153 组互相独立、却声明了同一个包名的插件（例如两个作者的 `dsh-model-picker`）。索引里一个包名只能有一条，转换器按「npm 已发布 > 下载量 > stars > 更早收录」保留其一，其余写进报告的 `duplicates`。
-
-## 目录
-
-```
-convert.mjs              转换器（写文件前用 DSH 官方校验器自检）
-verify-dsh-market.mts    用 DSH 读取器做端到端验证
-publish.sh               生成 → 推 dist 分支 → 清 jsDelivr 缓存
-.github/workflows/rebuild.yml   每天自动重建并发布
-out/dsh-index.json       生成的索引
-out/dsh-index.json.report.json  逐条跳过原因
-.cache/                  解析缓存（不入库）
-```
+索引的生成、发布与验证方式见 [TOOLING.md](TOOLING.md)：转换器逐条回源核实、用 DSH 官方校验器自检、每天由 GitHub Actions 自动重建，同时支持本机 `./publish.sh` 手动发布。
