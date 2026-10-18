@@ -262,10 +262,12 @@ function parseGitHubUrl(url) {
   if (owner === '' || repo === '') return undefined
   const repoUrl = `https://github.com/${owner}/${repo}`
   if (segments[2] !== 'tree' || segments.length < 5) return { owner, repo, repoUrl }
+  const rawDirectory = segments.slice(4).map(segment => decodeURIComponent(segment)).join('/')
+  const directory = packageDirectory(rawDirectory)
   return {
     owner, repo, repoUrl,
     branch: segments[3],
-    directory: segments.slice(4).map(segment => decodeURIComponent(segment)).join('/'),
+    ...(directory === undefined ? {} : { directory }),
   }
 }
 
@@ -834,16 +836,20 @@ function buildIndex(source, entries, outcomes, options) {
   for (const [index, outcome] of outcomes.entries()) {
     const plugin = outcome.plugin
     if (plugin === undefined) continue
-    if (plugin.metadata.category !== undefined && categories[plugin.metadata.category] === undefined) plugin.metadata.category = undefined
+    if (plugin.metadata.category !== undefined && categories[plugin.metadata.category] === undefined) delete plugin.metadata.category
     plugin.metadata.labels = plugin.metadata.labels.filter(label => labels[label] !== undefined)
     // A source URL can name a package directory inside a repository (`.../tree/<branch>/<dir>`); the repository page is
     // the repository root, and the directory belongs in `repository.directory`. Derived here so a cached resolution follows it.
     const githubEntry = parseGitHubUrl(String(entries[index].url))
     if (githubEntry !== undefined && plugin.repository !== undefined) {
       plugin.repository.url = githubEntry.repoUrl
-      if (plugin.repository.directory === undefined && githubEntry.directory !== undefined) {
-        plugin.repository.directory = githubEntry.directory
+      const directory = githubEntry.directory === undefined ? undefined : packageDirectory(githubEntry.directory)
+      if (plugin.repository.directory === undefined && directory !== undefined) {
+        plugin.repository.directory = directory
       }
+    }
+    if (plugin.repository?.directory !== undefined && packageDirectory(plugin.repository.directory) === undefined) {
+      delete plugin.repository.directory
     }
     const kept = byName.get(plugin.name)
     if (kept === undefined) {
